@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  weaviate:
+    image: semitechnologies/weaviate:1.22.4
+    ports:
+      - "8080:8080"
+    environment:
+      - QUERY_DEFAULTS_LIMIT=25
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      # Default: local open-source embeddings via transformers sidecar (no API key)
+      - DEFAULT_VECTORIZER_MODULE=text2vec-transformers
+      - ENABLE_MODULES=text2vec-transformers
+      - TRANSFORMERS_INFERENCE_API=http://t2v:8080
+      # To use OpenAI embeddings instead, comment the three lines above and uncomment below (requires OPENAI_API_KEY):
+      # - DEFAULT_VECTORIZER_MODULE=text2vec-openai
+      # - ENABLE_MODULES=text2vec-openai
+      # - OPENAI_APIKEY=${OPENAI_API_KEY}
+      # If you switch to OpenAI, also comment out the t2v service below.
+      - CLUSTER_HOSTNAME=node1
+    depends_on:
+      - t2v
+
+  # Sidecar: lightweight HF sentence-transformer server (CPU)
+  t2v:
+    image: semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      - ENABLE_CUDA=false
+    expose:
+      - "8080"
+    # Optional: publish for host debugging
+    # ports:
+    #   - "8081:8080"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  weaviate_data:
+

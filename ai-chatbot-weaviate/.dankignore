@@ -1,0 +1,27 @@
+# Security - Environment variables (IMPORTANT: Never commit .env files!)
+*.key
+*.pem
+secrets/
+
+# Dependencies (installed fresh in container)
+node_modules/
+
+# Version control
+.git/
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/

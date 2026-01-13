@@ -1,0 +1,33 @@
+{
+  "name": "ai-chatbot-weaviate",
+  "version": "1.0.0",
+  "description": "Dank AI agents for ai-chatbot-weaviate",
+  "main": "dank.config.js",
+  "scripts": {
+    "start": "dank run",
+    "dev": "dank run --config dank.config.js",
+    "stop": "dank stop",
+    "status": "dank status",
+    "logs": "dank logs",
+    "build": "dank build",
+    "clean": "dank clean"
+  },
+  "dependencies": {
+    "dank-ai": "^1.0.49",
+    "dotenv": "^16.4.5",
+    "weaviate-ts-client": "^1.6.0"
+  },
+  "keywords": [
+    "dank",
+    "ai",
+    "agents",
+    "automation",
+    "llm"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "chatbot": "bash run-local.sh",
+    "chatbot-stop": "bash -lc '\n      ROOT=$(pwd)\n      PID_DIR=\"$ROOT/logs/pids\"\n      AGENT_PID_FILE=\"$PID_DIR/agent.pid\"\n      FRONT_PID_FILE=\"$PID_DIR/frontend.pid\"\n      if [[ -f \"$AGENT_PID_FILE\" ]]; then\n        AGENT_PID=$(cat \"$AGENT_PID_FILE\")\n        kill -TERM \"-$AGENT_PID\" 2>/dev/null || kill \"$AGENT_PID\" 2>/dev/null || true\n        rm -f \"$AGENT_PID_FILE\"\n      fi\n      if [[ -f \"$FRONT_PID_FILE\" ]]; then\n        FRONT_PID=$(cat \"$FRONT_PID_FILE\")\n        kill -TERM \"-$FRONT_PID\" 2>/dev/null || kill \"$FRONT_PID\" 2>/dev/null || true\n        rm -f \"$FRONT_PID_FILE\"\n      fi\n      # Fallback: ensure common dev ports are freed\n      for p in 5173 5174 5175; do\n        lsof -ti tcp:$p | xargs -r kill;\n      done\n      # Stop dockerized services\n      (cd ai-chatbot-weaviate && (docker compose down || docker-compose down || true))\n      docker ps --filter \"name=dank\" -q | xargs -r docker rm -f || true\n    '"
+  },
+  "dependencies": {
+    "dank-ai": "^1.0.49"
+  }
+}
