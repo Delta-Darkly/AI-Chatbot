@@ -23,7 +23,7 @@ const { createAgent } = require('dank-ai');
 // Agent IDs - Generated UUIDv4 identifiers for each agent
 // These IDs are used to uniquely identify your agents across deployments
 const AGENT_IDS = {
-  PROMPT_AGENT: '35e31c53-0a16-4a44-87b1-5f3300bda0d3'
+  PROMPT_AGENT: '7b01b739-ed8b-4a8b-aa0c-20979858eeb5'
 };
 
 module.exports = {
