@@ -1,15 +1,25 @@
 /**
  * Weaviate Integration Handlers (hosted Messages schema)
- * Uses headers (Authorization, X-Project-ID) from env/inline
+ * Uses headers (X-API-Key, X-Project-ID) from env/inline
  */
 
 let currentWeaviateHost = '';
 
+/**
+ * Get tenant ID (project ID) for multi-tenant operations
+ * Returns null for local mode (no multi-tenancy)
+ */
+function getTenant() {
+  const mode = process.env.WEAVIATE_ENV || 'prod';
+  if (mode === 'local') return null;
+  return process.env.WEAVIATE_DANK_PROJECT_ID || null;
+}
+
 function getWeaviateClient() {
   const weaviate = require('weaviate-ts-client');
   const mode = process.env.WEAVIATE_ENV || 'prod'; // 'local' or 'prod'
-  const apiKey = process.env.WEAVIATE_DANK_API_KEY
-  const projectId = process.env.WEAVIATE_DANK_PROJECT_ID
+  const apiKey = process.env.WEAVIATE_DANK_API_KEY;
+  const projectId = process.env.WEAVIATE_DANK_PROJECT_ID;
   const prodHostRaw = process.env.WEAVIATE_HOST || 'https://weaviate.ai-dank.xyz'; // Dank cloud weaviate host, can be replaced by independently deployed weaviate host (e.g. droplet deployment)
   const localHostRaw = process.env.WEAVIATE_LOCAL_HOST || 'http://host.docker.internal:8080'; // Run docker-compose up -d to start weaviate locally
 
@@ -77,34 +87,49 @@ async function ensureSchema(client) {
 async function getConversationContext(client, className, userId, conversationId, currentPrompt, limit = 10) {
   const convo = conversationId || 'default-conversation';
   const user = userId || 'default-user';
+  const tenant = getTenant();
 
-  const result = await client.graphql
-    .get()
-    .withClassName(className)
-    .withFields('role content conversation_id message_id parent_id timestamp user_id metadata _additional { distance }')
-    .withNearText({ concepts: [currentPrompt], certainty: 0.5 })
-    .withWhere({
-      operator: 'And',
-      operands: [
-        { path: ['conversation_id'], operator: 'Equal', valueString: convo },
-        { path: ['user_id'], operator: 'Equal', valueString: user },
-      ],
-    })
-    .withLimit(limit * 2)
-    .do();
+  try {
+    let query = client.graphql
+      .get()
+      .withClassName(className)
+      .withFields('role content conversation_id message_id parent_id timestamp user_id metadata _additional { distance }')
+      .withNearText({ concepts: [currentPrompt], certainty: 0.5 })
+      .withWhere({
+        operator: 'And',
+        operands: [
+          { path: ['conversation_id'], operator: 'Equal', valueString: convo },
+          { path: ['user_id'], operator: 'Equal', valueString: user },
+        ],
+      })
+      .withLimit(limit * 2);
+    
+    if (tenant) {
+      query = query.withTenant(tenant);
+    }
 
-  if (result.data?.Get?.[className]?.length) {
-    const messages = result.data.Get[className];
-    messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    const chronological = messages.slice(-limit);
-    let context = 'Previous conversation context:\n\n';
-    chronological.forEach((msg, idx) => {
-      const sim = msg._additional?.distance !== undefined ? (1 - msg._additional.distance).toFixed(3) : 'N/A';
-      const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
-      console.log(`[Weaviate] Message ${idx + 1}: role=${msg.role}, similarity=${sim}, timestamp=${msg.timestamp}`);
-      context += `${roleLabel}: ${msg.content}\n\n`;
-    });
-    return context;
+    const result = await query.do();
+
+    if (result.data?.Get?.[className]?.length) {
+      const messages = result.data.Get[className];
+      messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const chronological = messages.slice(-limit);
+      let context = 'Previous conversation context:\n\n';
+      chronological.forEach((msg, idx) => {
+        const sim = msg._additional?.distance !== undefined ? (1 - msg._additional.distance).toFixed(3) : 'N/A';
+        const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+        console.log(`[Weaviate] Message ${idx + 1}: role=${msg.role}, similarity=${sim}, timestamp=${msg.timestamp}`);
+        context += `${roleLabel}: ${msg.content}\n\n`;
+      });
+      return context;
+    }
+  } catch (error) {
+    // If tenant doesn't exist yet, treat as no context (tenant will be created on first write)
+    if (error.message && error.message.includes('tenant not found')) {
+      console.log('[Weaviate] Tenant does not exist yet, no previous context');
+    } else {
+      console.error('[Weaviate] Error retrieving conversation context:', error.message);
+    }
   }
   console.log('[Weaviate] No relevant messages found via vector search');
   return '';
@@ -113,8 +138,9 @@ async function getConversationContext(client, className, userId, conversationId,
 async function findUserMessageId(client, className, { userId, conversationId, content }) {
   const convo = conversationId || 'default-conversation';
   const user = userId || 'default-user';
+  const tenant = getTenant();
 
-  const result = await client.graphql
+  let query = client.graphql
     .get()
     .withClassName(className)
     .withFields('message_id content timestamp role conversation_id user_id')
@@ -127,8 +153,13 @@ async function findUserMessageId(client, className, { userId, conversationId, co
         { path: ['content'], operator: 'Equal', valueString: content || '' },
       ],
     })
-    .withLimit(5)
-    .do();
+    .withLimit(5);
+  
+  if (tenant) {
+    query = query.withTenant(tenant);
+  }
+
+  const result = await query.do();
 
   const messages = result.data?.Get?.[className] || [];
   if (!messages.length) return '';
@@ -141,8 +172,9 @@ async function storeMessage(client, className, { role, content, conversationId, 
   const convo = conversationId || 'default-conversation';
   const timestamp = new Date().toISOString();
   const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${role || 'message'}`;
+  const tenant = getTenant();
 
-  await client.data.creator()
+  let creator = client.data.creator()
     .withClassName(className)
     .withProperties({
       role,
@@ -153,8 +185,13 @@ async function storeMessage(client, className, { role, content, conversationId, 
       timestamp,
       user_id: userId || 'default-user',
       metadata: JSON.stringify({ source: 'dank-agent' }),
-    })
-    .do();
+    });
+  
+  if (tenant) {
+    creator = creator.withTenant(tenant);
+  }
+
+  await creator.do();
 
   const parentInfo = role === 'assistant' && parentId ? ` parent=${parentId}` : '';
   console.log(`[Weaviate] Stored ${role} message: ${messageId} host=${currentWeaviateHost} user=${userId} convo=${convo}${parentInfo}`);
@@ -172,7 +209,17 @@ async function handleRequestOutputStart(data) {
   try {
     const client = getWeaviateClient();
     const className = await ensureSchema(client);
+    
+    // Query for context first (before writing current message, so it's not included in context)
     const conversationContext = await getConversationContext(client, className, userId, conversationId, data.prompt);
+
+    // Write user message (creates tenant if it doesn't exist)
+    await storeMessage(client, className, {
+      role: 'user',
+      content: data.prompt,
+      conversationId,
+      userId
+    });
 
     let enhancedPrompt;
     if (conversationContext) {
@@ -180,13 +227,6 @@ async function handleRequestOutputStart(data) {
     } else {
       enhancedPrompt = data.prompt;
     }
-
-    await storeMessage(client, className, {
-      role: 'user',
-      content: data.prompt,
-      conversationId,
-      userId
-    });
 
     return { prompt: enhancedPrompt };
   } catch (error) {
@@ -204,17 +244,25 @@ async function handleRequestOutputEnd(data) {
     return { response: `${data.response}\n\nWarning: agent memory disabled because userId and conversationId were not provided.` };
   }
 
-  const originalPrompt = data.prompt;
-  const parentUserMessageId = await findUserMessageId(getWeaviateClient(), await ensureSchema(getWeaviateClient()), {
-    userId,
-    conversationId,
-    content: originalPrompt
-  });
-
   try {
     const client = getWeaviateClient();
     const className = await ensureSchema(client);
-    if (originalPrompt && data.response) {
+    
+    // Try to find parent message ID (tenant should exist from handleRequestOutputStart, but handle gracefully)
+    let parentUserMessageId = '';
+    try {
+      parentUserMessageId = await findUserMessageId(client, className, {
+        userId,
+        conversationId,
+        content: data.prompt
+      });
+    } catch (error) {
+      // If query fails (e.g., tenant doesn't exist), continue without parent ID
+      console.log('[Weaviate] Could not find parent message ID, storing without parent reference');
+    }
+
+    // Always write assistant message (creates tenant if needed)
+    if (data.response) {
       await storeMessage(client, className, {
         role: 'assistant',
         content: data.response,
