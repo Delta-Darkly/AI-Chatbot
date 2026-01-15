@@ -1,23 +1,42 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Handle /api/weaviate/* routes
+// Handle /api/weaviate and all sub-paths via rewrite
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Extract the path segments from the catch-all parameter
-    const pathParts = req.query.path;
-    const subPath = Array.isArray(pathParts) ? pathParts.join('/') : (pathParts || '');
+    // Debug: log what we're receiving
+    console.log('[Weaviate Proxy] req.url:', req.url);
+    console.log('[Weaviate Proxy] req.query:', req.query);
+    console.log('[Weaviate Proxy] headers:', Object.keys(req.headers));
     
-    // Get query string from req.url safely
-    let search = '';
-    if (req.url) {
-      const queryIndex = req.url.indexOf('?');
-      if (queryIndex !== -1) {
-        search = req.url.substring(queryIndex);
+    // Try multiple methods to get the path
+    let weaviatePath = '';
+    
+    // Method 1: From query parameter (if rewrite passed it)
+    const pathParam = req.query.path;
+    if (pathParam) {
+      weaviatePath = Array.isArray(pathParam) ? pathParam.join('/') : String(pathParam);
+    } else {
+      // Method 2: Extract from req.url if it contains the full path
+      const urlStr = req.url || '';
+      if (urlStr.includes('/api/weaviate/')) {
+        const match = urlStr.match(/\/api\/weaviate\/(.+?)(?:\?|$)/);
+        if (match) {
+          weaviatePath = match[1];
+        }
       }
     }
     
+    // Get original query string (excluding our path param if it exists)
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const searchParams = new URLSearchParams(url.searchParams);
+    searchParams.delete('path'); // Remove our internal path param if present
+    const search = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    
     const targetBase = process.env.WEAVIATE_HOST || 'https://weaviate.ai-dank.xyz';
-    const targetUrl = `${targetBase}/${subPath}${search}`;
+    const targetUrl = `${targetBase}/${weaviatePath}${search}`;
+    
+    console.log('[Weaviate Proxy] Extracted path:', weaviatePath);
+    console.log('[Weaviate Proxy] Target URL:', targetUrl);
 
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
@@ -66,7 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[Weaviate Proxy] Error:', error);
     res.status(500).json({ 
       error: 'Internal server error', 
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

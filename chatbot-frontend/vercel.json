@@ -2,6 +2,14 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/weaviate/:path*",
+      "destination": "/api/weaviate?path=:path*"
+    },
+    {
+      "source": "/api/agent/:path*",
+      "destination": "/api/agent?path=:path*"
+    },
+    {
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }

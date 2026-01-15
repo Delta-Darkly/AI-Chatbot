@@ -1,23 +1,41 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Handle /api/agent/* routes
+// Handle /api/agent and all sub-paths via rewrite
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Extract the path segments from the catch-all parameter
-    const pathParts = req.query.path;
-    const subPath = Array.isArray(pathParts) ? pathParts.join('/') : (pathParts || '');
+    // Debug: log what we're receiving
+    console.log('[Agent Proxy] req.url:', req.url);
+    console.log('[Agent Proxy] req.query:', req.query);
     
-    // Get query string from req.url safely
-    let search = '';
-    if (req.url) {
-      const queryIndex = req.url.indexOf('?');
-      if (queryIndex !== -1) {
-        search = req.url.substring(queryIndex);
+    // Try multiple methods to get the path
+    let agentPath = '';
+    
+    // Method 1: From query parameter (if rewrite passed it)
+    const pathParam = req.query.path;
+    if (pathParam) {
+      agentPath = Array.isArray(pathParam) ? pathParam.join('/') : String(pathParam);
+    } else {
+      // Method 2: Extract from req.url if it contains the full path
+      const urlStr = req.url || '';
+      if (urlStr.includes('/api/agent/')) {
+        const match = urlStr.match(/\/api\/agent\/(.+?)(?:\?|$)/);
+        if (match) {
+          agentPath = match[1];
+        }
       }
     }
     
+    // Get original query string (excluding our path param if it exists)
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const searchParams = new URLSearchParams(url.searchParams);
+    searchParams.delete('path'); // Remove our internal path param if present
+    const search = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    
     const targetBase = process.env.AGENT_HOST || 'https://<your-agent-domain>.ai-dank.xyz';
-    const targetUrl = `${targetBase}/${subPath}${search}`;
+    const targetUrl = `${targetBase}/${agentPath}${search}`;
+    
+    console.log('[Agent Proxy] Extracted path:', agentPath);
+    console.log('[Agent Proxy] Target URL:', targetUrl);
 
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
@@ -63,7 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[Agent Proxy] Error:', error);
     res.status(500).json({ 
       error: 'Internal server error', 
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
