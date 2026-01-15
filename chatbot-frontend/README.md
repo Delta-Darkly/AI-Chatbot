@@ -1,4 +1,8 @@
-### Chatbot Frontend (React + Vite)
+### 💻 Chatbot Frontend (React + Vite)
+
+[![React](https://img.shields.io/badge/React-18+-61dafb?logo=react&logoColor=white)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-Bundler-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 Minimal chat UI wired to a **Dank AI agent** (with Weaviate memory). This frontend exists to:
 
@@ -10,7 +14,7 @@ It assumes you are using the agent from `ai-chatbot-weaviate` (or a compatible D
 
 ---
 
-## Overview
+## 🧩 Overview
 
 #### What it does
 
@@ -34,7 +38,7 @@ It assumes you are using the agent from `ai-chatbot-weaviate` (or a compatible D
 
 ---
 
-## Table of Contents
+## 📚 Table of Contents
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
@@ -47,7 +51,7 @@ It assumes you are using the agent from `ai-chatbot-weaviate` (or a compatible D
 
 ---
 
-## Quick Start
+## ⚡ Quick Start
 
 ### Whole Stack (from repo root)
 
@@ -88,7 +92,7 @@ You must configure `.env` so the frontend knows whether to talk to:
 
 ---
 
-## Environment & Modes
+## 🌐 Environment & Modes
 
 ### Env config (`.env.example`)
 
@@ -129,7 +133,7 @@ Locally (Vite dev server), **`vite.config.js`** reads `WEAVIATE_ENV` and `AGENT_
 
 ---
 
-## Service Files
+## 🧱 Service Files
 
 The main purpose of this frontend is to provide **reusable service files** you can copy into your own app.
 
@@ -190,7 +194,7 @@ If you already have your own UI (React, Next, etc.), you can copy these two file
 
 ---
 
-## Proxies & CORS
+## 🔁 Proxies & CORS
 
 ### Why proxies?
 
@@ -255,7 +259,7 @@ From the browser’s point of view, it **always** talks to your frontend at `/ap
 
 ---
 
-## Deployment (Vercel)
+## 🚀 Deployment (Vercel)
 
 ### 1. Prepare the agent + Weaviate
 
@@ -299,7 +303,7 @@ AGENT_DANK_API_KEY=your-agent-api-key       # Only if your agent requires auth
 
 ---
 
-## What to Reuse
+## ♻️ What to Reuse
 
 - **`src/services/agentService.ts`**:
   - Handles calling the agent’s `/prompt` endpoint
@@ -320,7 +324,7 @@ You can copy these pieces into your own app and adapt as needed.
 
 ---
 
-## Troubleshooting
+## 🩺 Troubleshooting
 
 ### 405 / 404 / 500 on `/api/agent` or `/api/weaviate`
 
