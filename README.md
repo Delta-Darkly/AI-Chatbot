@@ -2,7 +2,7 @@
 
 > A production-ready, full-stack template demonstrating how to build an AI chatbot with persistent memory using **Dank AI** agents and **Weaviate** vector database. Optimized for quick local development (one command) and seamless deployment to production.
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 
 ---
