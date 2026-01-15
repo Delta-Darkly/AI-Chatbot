@@ -1,26 +1,26 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-// Handle /api/agent and all sub-paths via rewrite
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// Handle /api/weaviate and all sub-paths via rewrite
+// Using CommonJS for Vercel Node.js runtime compatibility
+module.exports = async function handler(req, res) {
   try {
     // Debug: log what we're receiving
-    console.log('[Agent Proxy] req.url:', req.url);
-    console.log('[Agent Proxy] req.query:', req.query);
+    console.log('[Weaviate Proxy] req.url:', req.url);
+    console.log('[Weaviate Proxy] req.query:', req.query);
+    console.log('[Weaviate Proxy] headers:', Object.keys(req.headers));
     
     // Try multiple methods to get the path
-    let agentPath = '';
+    let weaviatePath = '';
     
     // Method 1: From query parameter (if rewrite passed it)
     const pathParam = req.query.path;
     if (pathParam) {
-      agentPath = Array.isArray(pathParam) ? pathParam.join('/') : String(pathParam);
+      weaviatePath = Array.isArray(pathParam) ? pathParam.join('/') : String(pathParam);
     } else {
       // Method 2: Extract from req.url if it contains the full path
       const urlStr = req.url || '';
-      if (urlStr.includes('/api/agent/')) {
-        const match = urlStr.match(/\/api\/agent\/(.+?)(?:\?|$)/);
+      if (urlStr.includes('/api/weaviate/')) {
+        const match = urlStr.match(/\/api\/weaviate\/(.+?)(?:\?|$)/);
         if (match) {
-          agentPath = match[1];
+          weaviatePath = match[1];
         }
       }
     }
@@ -31,13 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     searchParams.delete('path'); // Remove our internal path param if present
     const search = searchParams.toString() ? `?${searchParams.toString()}` : '';
     
-    const targetBase = process.env.AGENT_HOST || 'https://<your-agent-domain>.ai-dank.xyz';
-    const targetUrl = `${targetBase}/${agentPath}${search}`;
+    const targetBase = process.env.WEAVIATE_HOST || 'https://weaviate.ai-dank.xyz';
+    const targetUrl = `${targetBase}/${weaviatePath}${search}`;
     
-    console.log('[Agent Proxy] Extracted path:', agentPath);
-    console.log('[Agent Proxy] Target URL:', targetUrl);
+    console.log('[Weaviate Proxy] Extracted path:', weaviatePath);
+    console.log('[Weaviate Proxy] Target URL:', targetUrl);
 
-    const headers: Record<string, string> = {};
+    const headers = {};
     for (const [key, value] of Object.entries(req.headers)) {
       if (key.toLowerCase() === 'host') continue;
       if (Array.isArray(value)) {
@@ -47,11 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    if (process.env.AGENT_DANK_API_KEY) {
-      headers['X-API-Key'] = process.env.AGENT_DANK_API_KEY;
+    if (process.env.WEAVIATE_DANK_API_KEY) {
+      headers['X-API-Key'] = process.env.WEAVIATE_DANK_API_KEY;
+    }
+    if (process.env.WEAVIATE_DANK_PROJECT_ID) {
+      headers['X-Project-ID'] = process.env.WEAVIATE_DANK_PROJECT_ID;
     }
 
-    let body: BodyInit | undefined;
+    let body;
     if (!['GET', 'HEAD'].includes(req.method || '')) {
       if (req.body && typeof req.body === 'object') {
         body = JSON.stringify(req.body);
@@ -77,8 +80,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     respHeaders.forEach((v, k) => res.setHeader(k, v));
     const buf = Buffer.from(await upstream.arrayBuffer());
     res.send(buf);
-  } catch (error: any) {
-    console.error('[Agent Proxy] Error:', error);
+  } catch (error) {
+    console.error('[Weaviate Proxy] Error:', error);
     res.status(500).json({ 
       error: 'Internal server error', 
       message: error.message,
