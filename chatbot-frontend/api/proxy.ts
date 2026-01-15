@@ -1,17 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Single catch-all handler for all API routes
-// This handles /api/weaviate/* and /api/agent/* by routing internally
+// Single proxy handler for all API routes
+// Vercel should preserve the original request URL in req.url
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const pathParts = req.query.path;
-  const fullPath = Array.isArray(pathParts) ? pathParts.join('/') : pathParts || '';
+  // Try to get original URL from x-vercel-original-path header or req.url
+  const originalPath = (req.headers['x-vercel-original-path'] as string) || req.url || '';
+  const url = new URL(originalPath, `http://${req.headers.host || 'localhost'}`);
+  const pathname = url.pathname;
+  const search = url.search;
   
-  // Determine which service to proxy to based on the first path segment
-  if (fullPath.startsWith('weaviate/')) {
-    // Proxy to Weaviate - remove 'weaviate/' prefix
-    const weaviatePath = fullPath.replace(/^weaviate\//, '');
-    const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-    const search = url.search;
+  // Determine which service to proxy to based on the path
+  if (pathname.startsWith('/api/weaviate')) {
+    // Proxy to Weaviate - extract path after /api/weaviate
+    const weaviatePath = pathname.replace('/api/weaviate', '').replace(/^\//, '');
     const targetBase = process.env.WEAVIATE_HOST || 'https://weaviate.ai-dank.xyz';
     const targetUrl = `${targetBase}/${weaviatePath}${search}`;
 
@@ -61,11 +62,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (fullPath.startsWith('agent/')) {
-    // Proxy to Agent - remove 'agent/' prefix
-    const agentPath = fullPath.replace(/^agent\//, '');
-    const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-    const search = url.search;
+  if (pathname.startsWith('/api/agent')) {
+    // Proxy to Agent - extract path after /api/agent
+    const agentPath = pathname.replace('/api/agent', '').replace(/^\//, '');
     const targetBase = process.env.AGENT_HOST || 'https://<your-agent-domain>.ai-dank.xyz';
     const targetUrl = `${targetBase}/${agentPath}${search}`;
 

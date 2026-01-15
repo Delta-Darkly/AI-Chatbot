@@ -2,8 +2,17 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/weaviate/:path*",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/api/agent/:path*",
+      "destination": "/api/proxy"
+    },
+    {
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
   ]
 }
+
